@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Hifdh Progress Tracker</title>
+<style>
+body { font-family: Arial; text-align: center; background-color: #fdf6e3; }
+.grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin: 20px; }
+.day { padding: 10px; border: 1px solid #ccc; cursor: pointer; font-size: 12px; white-space: pre-line; }
+.done { background-color: #4CAF50; color: white; }
+.missed { background-color: #f44336; color: white; }
+canvas { margin-top: 30px; max-width: 90%; }
+h1 { margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>📖 Hifdh Tracker</h1>
+<p id="streak"></p>
+<div class="grid" id="grid"></div>
+
+<h2>📊 Progress Summary</h2>
+<canvas id="summaryChart" width="600" height="300"></canvas>
+
+<h2>📈 Daily Streak Over Time</h2>
+<canvas id="streakChart" width="600" height="300"></canvas>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const grid = document.getElementById("grid");
+const streakText = document.getElementById("streak");
+
+// Settings
+const startDate = new Date(2026, 1, 23); // Feb 23, 2026
+const totalPages = 365;
+let progress = JSON.parse(localStorage.getItem("progress")) || {};
+
+// Create the daily grid
+for (let i = 1; i <= totalPages; i++) {
+    let div = document.createElement("div");
+    div.className = "day";
+
+    let pageNum = i;
+    let dayDate = new Date(startDate.getTime() + (i-1)*86400000);
+    let dayString = (dayDate.getMonth()+1) + "/" + dayDate.getDate();
+
+    div.innerText = "P"+pageNum + "\n" + dayString;
+
+    if (progress[i] === "done") div.classList.add("done");
+    if (progress[i] === "missed") div.classList.add("missed");
+
+    div.onclick = function() {
+        progress[i] = "done";
+        localStorage.setItem("progress", JSON.stringify(progress));
+        location.reload();
+    };
+
+    grid.appendChild(div);
+}
+
+// Mark missed days
+function updateMissedDays() {
+    let today = new Date();
+    let daysSinceStart = Math.floor((today - startDate) / 86400000) + 1;
+    if(daysSinceStart > totalPages) daysSinceStart = totalPages;
+
+    for (let i = 1; i <= daysSinceStart; i++) {
+        if (!progress[i]) progress[i] = "missed";
+    }
+    localStorage.setItem("progress", JSON.stringify(progress));
+}
+
+// Calculate current streak
+function calculateStreak() {
+    let streak = 0;
+    for (let i = 1; i <= totalPages; i++) {
+        if (progress[i] === "done") streak++;
+        else break;
+    }
+    streakText.innerText = "Current Streak: " + streak + " days";
+}
+
+// Draw summary bar chart
+function drawSummaryChart() {
+    let doneCount = 0, missedCount = 0, pendingCount = 0;
+    for (let i = 1; i <= totalPages; i++) {
+        if (progress[i] === "done") doneCount++;
+        else if (progress[i] === "missed") missedCount++;
+        else pendingCount++;
+    }
+
+    const ctx = document.getElementById('summaryChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Done', 'Missed', 'Pending'],
+            datasets: [{
+                label: 'Pages',
+                data: [doneCount, missedCount, pendingCount],
+                backgroundColor: ['#4CAF50','#f44336','#FFC107']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, max: totalPages } }
+        }
+    });
+}
+
+// Draw streak line chart over time
+function drawStreakChart() {
+    let labels = [], streakData = [], streakCounter = 0;
+
+    for (let i = 1; i <= totalPages; i++) {
+        let dayDate = new Date(startDate.getTime() + (i-1)*86400000);
+        labels.push((dayDate.getMonth()+1) + "/" + dayDate.getDate());
+
+        if (progress[i] === "done") streakCounter++;
+        else streakCounter = 0; // reset if missed
+        streakData.push(streakCounter);
+    }
+
+    const ctx = document.getElementById('streakChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Daily Streak',
+                data: streakData,
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                fill: true,
+                tension: 0.2,
+                pointRadius: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, max: totalPages } }
+        }
+    });
+}
+
+updateMissedDays();
+calculateStreak();
+drawSummaryChart();
+drawStreakChart();
+</script>
+</body>
+</html>
